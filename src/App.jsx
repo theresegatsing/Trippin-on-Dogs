@@ -12,7 +12,6 @@ function App() {
   const [history, setHistory] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [seenBreeds, setSeenBreeds] = useState(new Set());
 
   // Check if any of the dog's attributes are banned
   
