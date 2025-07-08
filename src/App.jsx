@@ -1,10 +1,9 @@
-
 import { useState, useEffect } from 'react';
 import './App.css';
 
-// API configuration
 const API_KEY = 'live_MEn3L9E4hg7qa5TMTTLvroujvSFwTagUsicnp0ErYiqWFR7tyMzzZ5xMxT3se7SE';
 const API_URL = 'https://api.thedogapi.com/v1/images/search';
+const MAX_HISTORY = 50; // Store more dogs to reduce repeats
 
 function App() {
   const [currentDog, setCurrentDog] = useState(null);
@@ -12,6 +11,7 @@ function App() {
   const [history, setHistory] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [seenBreeds, setSeenBreeds] = useState(new Set());
 
   const fetchRandomDog = async () => {
     setIsLoading(true);
@@ -19,26 +19,22 @@ function App() {
     try {
       let validDogFound = false;
       let attempts = 0;
-      const maxAttempts = 5;
+      const maxAttempts = 10; // Increased attempts to find unique dog
       
       while (!validDogFound && attempts < maxAttempts) {
         attempts++;
         const response = await fetch(`${API_URL}?has_breeds=true&size=med`, {
-          headers: {
-            'x-api-key': API_KEY
-          }
+          headers: { 'x-api-key': API_KEY }
         });
 
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
 
         const data = await response.json();
         
         if (data[0]?.breeds?.length > 0) {
           const breedInfo = data[0].breeds[0];
           
-          if (breedInfo.name) {
+          if (breedInfo.name && !seenBreeds.has(breedInfo.name)) {
             const dogData = {
               image: data[0].url,
               breed: breedInfo.name,
@@ -48,14 +44,14 @@ function App() {
               origin: breedInfo.origin || 'Origin unknown'
             };
 
-            // Check if banned
             const isBanned = banList.some(item => 
               item.type === 'breed' && item.value === dogData.breed
             );
 
             if (!isBanned) {
               setCurrentDog(dogData);
-              setHistory(prev => [dogData, ...prev.slice(0, 9)]); // Keep only last 10
+              setHistory(prev => [dogData, ...prev.slice(0, MAX_HISTORY - 1)]);
+              setSeenBreeds(prev => new Set(prev).add(dogData.breed));
               validDogFound = true;
             }
           }
@@ -63,7 +59,9 @@ function App() {
       }
 
       if (!validDogFound) {
-        setError('Could not find a suitable dog. Try again or check your ban list.');
+        // If we can't find new breed, allow repeats but show message
+        setError('Showing repeat dog - we\'re having trouble finding new breeds!');
+        fetchRandomDog(); // Try again without breed uniqueness check
       }
     } catch (err) {
       setError(`Failed to fetch dog: ${err.message}`);
@@ -75,25 +73,16 @@ function App() {
 
   const handleAttributeClick = (type, value) => {
     if (!value || value.includes('unknown')) return;
-    
-    const isInBanList = banList.some(item => item.type === type && item.value === value);
-    
-    if (isInBanList) {
-      setBanList(banList.filter(item => !(item.type === type && item.value === value)));
-    } else {
-      setBanList([...banList, { type, value }]);
-    }
+    setBanList(prev => 
+      prev.some(item => item.type === type && item.value === value)
+        ? prev.filter(item => !(item.type === type && item.value === value))
+        : [...prev, { type, value }]
+    );
   };
 
   const getAttributeClassName = (type, value) => {
-    const baseClass = 'attribute';
-    const isBanned = banList.some(item => item.type === type && item.value === value);
-    return isBanned ? `${baseClass} banned` : baseClass;
+    return `attribute ${banList.some(item => item.type === type && item.value === value) ? 'banned' : ''}`;
   };
-
-  useEffect(() => {
-    fetchRandomDog();
-  }, []);
 
   return (
     <div className="app">
@@ -126,31 +115,31 @@ function App() {
 
         <div className="center-column">
           <div className="current-dog fixed-section">
-            {currentDog ? (
+            {currentDog && (
               <>
                 <h2>{currentDog.breed}</h2>
-                <img src={currentDog.image} alt={currentDog.breed} />
-                <div className="attributes">
+                <div className="image-container">
+                  <img src={currentDog.image} alt={currentDog.breed} />
+                </div>
+                <div className="attributes-container">
                   <p className={getAttributeClassName('breed', currentDog.breed)} 
                      onClick={() => handleAttributeClick('breed', currentDog.breed)}>
-                    Breed: {currentDog.breed}
+                    <strong>Breed:</strong> {currentDog.breed}
                   </p>
                   <p className={getAttributeClassName('temperament', currentDog.temperament)}
                      onClick={() => handleAttributeClick('temperament', currentDog.temperament)}>
-                    Temperament: {currentDog.temperament}
+                    <strong>Temperament:</strong> {currentDog.temperament}
                   </p>
                   <p className={getAttributeClassName('life_span', currentDog.life_span)}
                      onClick={() => handleAttributeClick('life_span', currentDog.life_span)}>
-                    Lifespan: {currentDog.life_span}
+                    <strong>Lifespan:</strong> {currentDog.life_span}
                   </p>
                   <p className={getAttributeClassName('origin', currentDog.origin)}
                      onClick={() => handleAttributeClick('origin', currentDog.origin)}>
-                    Origin: {currentDog.origin}
+                    <strong>Origin:</strong> {currentDog.origin}
                   </p>
                 </div>
               </>
-            ) : (
-              <p>{isLoading ? 'Finding your perfect pup...' : 'No dogs available right now'}</p>
             )}
           </div>
           <button onClick={fetchRandomDog} disabled={isLoading} className="discover-button">
