@@ -43,7 +43,7 @@ The following **optional** features are implemented:
 
 The following **additional** features are implemented:
 
-No additional features were implemented
+-No additional features were implemented
 
 ## Video Walkthrough
 
