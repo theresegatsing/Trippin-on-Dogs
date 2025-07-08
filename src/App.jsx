@@ -15,28 +15,34 @@ function App() {
   const [seenBreeds, setSeenBreeds] = useState(new Set());
 
   // Check if any of the dog's attributes are banned
+  
   const isDogBanned = (dogData) => {
     return banList.some(banItem => {
-      // Check breed
-      if (banItem.type === 'breed' && banItem.value === dogData.breed) return true;
-      
-      // Check temperament words
-      if (banItem.type === 'temperament' && 
-          dogData.temperament && 
-          dogData.temperament.toLowerCase().includes(banItem.value.toLowerCase())) {
+      const value = banItem.value.toLowerCase();
+
+      // Check breed (exact match or partial)
+      if (banItem.type === 'breed' && dogData.breed.toLowerCase().includes(value)) {
         return true;
       }
-      
-      // Check lifespan range
-      if (banItem.type === 'life_span' && 
-          dogData.life_span && 
-          dogData.life_span.includes(banItem.value)) {
+
+      // Check temperament (if the banned word is in the temperament string)
+      if (banItem.type === 'temperament' &&
+          dogData.temperament &&
+          dogData.temperament.toLowerCase().includes(value)) {
         return true;
       }
-      
+
+      // Check life_span (must match part of it)
+      if (banItem.type === 'life_span' &&
+          dogData.life_span &&
+          dogData.life_span.toLowerCase().includes(value)) {
+        return true;
+      }
+
       return false;
     });
   };
+
 
   const fetchRandomDog = async () => {
     setIsLoading(true);
@@ -91,14 +97,18 @@ function App() {
   const handleAttributeClick = (type, value) => {
     if (!value || value.includes('unknown')) return;
     
-    // For temperament, split into individual words to ban
+     // For temperament, ban all words
     if (type === 'temperament') {
       const words = value.split(/,|\s+/).filter(w => w.length > 0);
-      if (words.length > 1) {
-        setBanList(prev => [...prev, { type, value: words[0] }]); // Ban first word
-        return;
-      }
+      setBanList(prev => [
+        ...prev,
+        ...words
+          .filter(word => !prev.some(item => item.type === type && item.value.toLowerCase() === word.toLowerCase()))
+          .map(word => ({ type, value: word }))
+      ]);
+      return;
     }
+
     
     setBanList(prev => 
       prev.some(item => item.type === type && item.value === value)
