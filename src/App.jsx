@@ -41,7 +41,7 @@ function App() {
               temperament: breedInfo.temperament || 'Temperament unknown',
               life_span: breedInfo.life_span || 'Lifespan unknown',
               bred_for: breedInfo.bred_for || 'Purpose unknown',
-              origin: breedInfo.origin || 'Origin unknown'
+              
             };
 
             const isBanned = banList.some(item => 
@@ -134,10 +134,7 @@ function App() {
                      onClick={() => handleAttributeClick('life_span', currentDog.life_span)}>
                     <strong>Lifespan:</strong> {currentDog.life_span}
                   </p>
-                  <p className={getAttributeClassName('origin', currentDog.origin)}
-                     onClick={() => handleAttributeClick('origin', currentDog.origin)}>
-                    <strong>Origin:</strong> {currentDog.origin}
-                  </p>
+                  
                 </div>
               </>
             )}
