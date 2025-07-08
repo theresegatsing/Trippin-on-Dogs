@@ -75,7 +75,6 @@ function App() {
             if (!isDogBanned(dogData)) {
               setCurrentDog(dogData);
               setHistory(prev => [dogData, ...prev.slice(0, MAX_HISTORY - 1)]);
-              setSeenBreeds(prev => new Set(prev).add(dogData.breed));
               validDogFound = true;
             }
           }
