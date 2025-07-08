@@ -96,8 +96,20 @@ function App() {
 
   const handleAttributeClick = (type, value) => {
     if (!value || value.includes('unknown')) return;
-    
-     // For temperament, ban all words
+
+    const isAlreadyBanned = banList.some(
+      item => item.type === type && item.value.toLowerCase() === value.toLowerCase()
+    );
+
+    // 🔁 If already banned, toggle it off
+    if (isAlreadyBanned) {
+      setBanList(prev =>
+        prev.filter(item => !(item.type === type && item.value.toLowerCase() === value.toLowerCase()))
+      );
+      return;
+    }
+
+    // 🆕 Only process multi-word temperament when banning for the first time
     if (type === 'temperament') {
       const words = value.split(/,|\s+/).filter(w => w.length > 0);
       setBanList(prev => [
@@ -109,11 +121,9 @@ function App() {
       return;
     }
 
-    
-    setBanList(prev => 
-      prev.some(item => item.type === type && item.value === value)
-        ? prev.filter(item => !(item.type === type && item.value === value))
-        : [...prev, { type, value }]
+    // Default ban toggle for breed/life_span
+    setBanList(prev =>
+      [...prev, { type, value }]
     );
   };
 
