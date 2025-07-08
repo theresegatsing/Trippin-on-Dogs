@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import './App.css';
 
 const API_KEY = 'live_MEn3L9E4hg7qa5TMTTLvroujvSFwTagUsicnp0ErYiqWFR7tyMzzZ5xMxT3se7SE';
 const API_URL = 'https://api.thedogapi.com/v1/images/search';
-const MAX_HISTORY = 50; // Store more dogs to reduce repeats
+const MAX_HISTORY = 50;
+const MAX_ATTEMPTS = 15; // Increased attempts to find non-banned dogs
 
 function App() {
   const [currentDog, setCurrentDog] = useState(null);
@@ -13,15 +14,38 @@ function App() {
   const [error, setError] = useState(null);
   const [seenBreeds, setSeenBreeds] = useState(new Set());
 
+  // Check if any of the dog's attributes are banned
+  const isDogBanned = (dogData) => {
+    return banList.some(banItem => {
+      // Check breed
+      if (banItem.type === 'breed' && banItem.value === dogData.breed) return true;
+      
+      // Check temperament words
+      if (banItem.type === 'temperament' && 
+          dogData.temperament && 
+          dogData.temperament.toLowerCase().includes(banItem.value.toLowerCase())) {
+        return true;
+      }
+      
+      // Check lifespan range
+      if (banItem.type === 'life_span' && 
+          dogData.life_span && 
+          dogData.life_span.includes(banItem.value)) {
+        return true;
+      }
+      
+      return false;
+    });
+  };
+
   const fetchRandomDog = async () => {
     setIsLoading(true);
     setError(null);
     try {
       let validDogFound = false;
       let attempts = 0;
-      const maxAttempts = 10; // Increased attempts to find unique dog
       
-      while (!validDogFound && attempts < maxAttempts) {
+      while (!validDogFound && attempts < MAX_ATTEMPTS) {
         attempts++;
         const response = await fetch(`${API_URL}?has_breeds=true&size=med`, {
           headers: { 'x-api-key': API_KEY }
@@ -34,21 +58,16 @@ function App() {
         if (data[0]?.breeds?.length > 0) {
           const breedInfo = data[0].breeds[0];
           
-          if (breedInfo.name && !seenBreeds.has(breedInfo.name)) {
+          if (breedInfo.name) {
             const dogData = {
               image: data[0].url,
               breed: breedInfo.name,
               temperament: breedInfo.temperament || 'Temperament unknown',
-              life_span: breedInfo.life_span || 'Lifespan unknown',
-              bred_for: breedInfo.bred_for || 'Purpose unknown',
-              
+              life_span: breedInfo.life_span || 'Lifespan unknown'
             };
 
-            const isBanned = banList.some(item => 
-              item.type === 'breed' && item.value === dogData.breed
-            );
-
-            if (!isBanned) {
+            // Skip if any attribute is banned
+            if (!isDogBanned(dogData)) {
               setCurrentDog(dogData);
               setHistory(prev => [dogData, ...prev.slice(0, MAX_HISTORY - 1)]);
               setSeenBreeds(prev => new Set(prev).add(dogData.breed));
@@ -59,9 +78,7 @@ function App() {
       }
 
       if (!validDogFound) {
-        // If we can't find new breed, allow repeats but show message
-        setError('Showing repeat dog - we\'re having trouble finding new breeds!');
-        fetchRandomDog(); // Try again without breed uniqueness check
+        setError('No dogs found matching your criteria. Try adjusting your ban list.');
       }
     } catch (err) {
       setError(`Failed to fetch dog: ${err.message}`);
@@ -73,6 +90,16 @@ function App() {
 
   const handleAttributeClick = (type, value) => {
     if (!value || value.includes('unknown')) return;
+    
+    // For temperament, split into individual words to ban
+    if (type === 'temperament') {
+      const words = value.split(/,|\s+/).filter(w => w.length > 0);
+      if (words.length > 1) {
+        setBanList(prev => [...prev, { type, value: words[0] }]); // Ban first word
+        return;
+      }
+    }
+    
     setBanList(prev => 
       prev.some(item => item.type === type && item.value === value)
         ? prev.filter(item => !(item.type === type && item.value === value))
@@ -81,7 +108,21 @@ function App() {
   };
 
   const getAttributeClassName = (type, value) => {
-    return `attribute ${banList.some(item => item.type === type && item.value === value) ? 'banned' : ''}`;
+    if (!value || value.includes('unknown')) return 'attribute';
+    
+    // Special handling for temperament words
+    if (type === 'temperament') {
+      const words = value.split(/,|\s+/);
+      const isBanned = words.some(word => 
+        banList.some(item => item.type === type && item.value.toLowerCase() === word.toLowerCase())
+      );
+      return `attribute ${isBanned ? 'banned' : ''}`;
+    }
+    
+    const isBanned = banList.some(item => 
+      item.type === type && item.value === value
+    );
+    return `attribute ${isBanned ? 'banned' : ''}`;
   };
 
   return (
@@ -134,7 +175,6 @@ function App() {
                      onClick={() => handleAttributeClick('life_span', currentDog.life_span)}>
                     <strong>Lifespan:</strong> {currentDog.life_span}
                   </p>
-                  
                 </div>
               </>
             )}
